@@ -1,0 +1,22 @@
+[Unit]
+Description=FLIRONE Thermal Camera Web UI
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust path if your flirone-v4l2 is in a different location
+ExecStart=/home/pi/v4l2loopback/flirone-v4l2/src/flirone /home/pi/v4l2loopback/flirone-v4l2/src/flirone_config.json
+WorkingDirectory=/home/pi/v4l2loopback/flirone-v4l2/src
+Restart=on-failure
+RestartSec=5
+# Run as root (needed for USB access and servo GPIO)
+User=root
+# Graceful shutdown via SIGTERM
+KillSignal=SIGTERM
+TimeoutStopSec=10
+# Environment
+Environment=LD_LIBRARY_PATH=/home/pi/v4l2loopback/flirone-v4l2/src/components/dht12/lib:/home/pi/v4l2loopback/flirone-v4l2/src/components/servo/lib:/home/pi/v4l2loopback/flirone-v4l2/src/components/google_sheets/lib
+
+[Install]
+WantedBy=multi-user.target

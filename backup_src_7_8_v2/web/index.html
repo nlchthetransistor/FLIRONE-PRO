@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLIRONE Thermal Camera</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="logo">
+                <span class="logo-text">FLIRONE Thermal Camera</span>
+            </div>
+            <div class="header-status">
+                <span id="fps-counter">0 FPS</span>
+                <span id="connection-status" class="badge danger">Disconnected</span>
+            </div>
+        </header>
+        
+        <main>
+            <aside id="colorbar">
+                <div class="colorbar-container">
+                    <span id="temp-max" class="temp-label">--.-°C</span>
+                    <canvas id="colorbar-canvas" width="40" height="300"></canvas>
+                    <span id="temp-min" class="temp-label">--.-°C</span>
+                </div>
+            </aside>
+            
+            <section id="thermal-view">
+                <div class="canvas-wrapper">
+                    <canvas id="thermal-canvas" width="640" height="480"></canvas>
+                    <div id="roi-overlay" class="hidden"></div>
+                </div>
+            </section>
+            
+            <aside id="sidebar">
+                <div class="card ambient-card">
+                    <h3>Ambient</h3>
+                    <div class="card-content row-items">
+                        <div><span class="label">Ta:</span> <span id="ambient-temp">--.-</span>°C</div>
+                        <div><span class="label">RH:</span> <span id="ambient-rh">--.-</span>%</div>
+                        <div id="dht-status" class="badge danger">DHT N/A</div>
+                    </div>
+                </div>
+
+                <div class="card tuning-card">
+                    <h3>Tuning <button id="btn-reset-tune" class="btn-small">Reset</button></h3>
+                    <div class="card-content">
+                        <div class="slider-group">
+                            <label>Emissivity <span id="val-emissivity">0.98</span></label>
+                            <input type="range" id="tune-emissivity" min="0.70" max="1.00" step="0.01" value="0.98">
+                        </div>
+                        <div class="slider-group">
+                            <label>Refl Offset <span id="val-refl_offset">0.0</span></label>
+                            <input type="range" id="tune-refl_offset" min="-20.0" max="20.0" step="0.10" value="0.0">
+                        </div>
+                        <div class="slider-group">
+                            <label>Raw Scale <span id="val-raw_scale">4.0</span></label>
+                            <input type="range" id="tune-raw_scale" min="1.0" max="6.0" step="0.05" value="4.0">
+                        </div>
+                        <div class="slider-group">
+                            <label>Temp Offset <span id="val-temp_offset">0.0</span></label>
+                            <input type="range" id="tune-temp_offset" min="-10.0" max="10.0" step="0.10" value="0.0">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card servo-card">
+                    <h3>Servo <span id="servo-status" class="badge">OFF</span></h3>
+                    <div class="card-content servo-controls">
+                        <button id="btn-servo-left" class="btn">◀ Left</button>
+                        <div class="servo-angle"><span id="servo-angle-val">--</span>°</div>
+                        <button id="btn-servo-right" class="btn">Right ▶</button>
+                    </div>
+                </div>
+
+                <div class="card patient-card">
+                    <h3>Patient</h3>
+                    <div class="card-content">
+                        <input type="text" id="patient-name" placeholder="Name">
+                        <div class="row-inputs">
+                            <input type="number" id="patient-age" placeholder="Age">
+                            <select id="patient-gender">
+                                <option value="">Gender</option>
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                                <option value="O">Other</option>
+                            </select>
+                        </div>
+                        <button id="btn-patient-apply" class="btn btn-full">Apply</button>
+                    </div>
+                </div>
+
+                <div class="card screenshot-card">
+                    <h3>Screenshot</h3>
+                    <div class="card-content">
+                        <button id="btn-screenshot" class="btn btn-full btn-accent">📷 Capture</button>
+                        <a id="download-link" style="display:none;" class="btn btn-full">💾 Download Last</a>
+                    </div>
+                </div>
+
+                <div class="card measurement-card">
+                    <h3>Measurements</h3>
+                    <div class="card-content">
+                        <ul id="measurement-log">
+                        </ul>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

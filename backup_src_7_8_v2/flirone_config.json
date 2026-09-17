@@ -1,0 +1,40 @@
+{
+    "web_server": {
+        "port": 8080,
+        "host": "0.0.0.0",
+        "web_root": "./web"
+    },
+    "google_sheets": {
+        "url": "https://script.google.com/macros/s/AKfycbz2TfvPLzgVIyvHZDzXWgKd64Fq5TFxMenrFzKO5xzHjrznV4UKUyFG-4fLmb1m_q0N/exec"
+    },
+    "servo": {
+        "use_pca9685": true,
+        "channel": 0,
+        "i2c_bus": 1,
+        "i2c_addr": 64,
+        "pwm_freq": 50.0,
+        "min_pulse": 1000,
+        "max_pulse": 2000,
+        "initial_angle": 90.0,
+        "angle_step": 10.0,
+        "display_min": -45.0,
+        "display_max": 45.0,
+        "display_step": 5.0
+    },
+    "dht12": {
+        "i2c_bus": 1,
+        "i2c_addr": 92
+    },
+    "thermal": {
+        "default_emissivity": 0.98,
+        "default_raw_scale": 4.0,
+        "default_refl_offset": 0.0,
+        "default_temp_offset": 0.0
+    },
+    "palette_path": "../palettes/Iron2.raw",
+    "screenshots_dir": "screenshots",
+    "usb": {
+        "vendor_id": 2507,
+        "product_id": 6550
+    }
+}
