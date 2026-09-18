@@ -36,6 +36,14 @@ struct AppConfig {
     double default_refl_offset = 0.0;
     double default_temp_offset = 0.0;
 
+    // Atmospheric compensation
+    double default_distance = 0.5;           // Distance to object [m]
+    bool   atmospheric_compensation = true;  // Enable atmospheric correction
+    double ema_alpha = 0.3;                  // EMA smoothing (0.1=smooth, 1.0=off)
+
+    // Warm-up management
+    int    warmup_minutes = 15;              // Minutes to consider camera stable
+
     // Palette
     std::string palette_path = "../palettes/Iron2.raw";
 

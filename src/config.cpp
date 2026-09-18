@@ -67,6 +67,10 @@ AppConfig load_config(const std::string& path) {
         cfg.default_raw_scale   = jget(j, "thermal", "default_raw_scale", cfg.default_raw_scale);
         cfg.default_refl_offset = jget(j, "thermal", "default_refl_offset", cfg.default_refl_offset);
         cfg.default_temp_offset = jget(j, "thermal", "default_temp_offset", cfg.default_temp_offset);
+        cfg.default_distance    = jget(j, "thermal", "default_distance", cfg.default_distance);
+        cfg.atmospheric_compensation = jget(j, "thermal", "atmospheric_compensation", cfg.atmospheric_compensation);
+        cfg.ema_alpha           = jget(j, "thermal", "ema_alpha", cfg.ema_alpha);
+        cfg.warmup_minutes      = jget(j, "thermal", "warmup_minutes", cfg.warmup_minutes);
 
         // Top-level keys
         cfg.palette_path     = jget_top<std::string>(j, "palette_path", cfg.palette_path);
@@ -112,6 +116,10 @@ void save_default_config(const std::string& path) {
         j["thermal"]["default_raw_scale"]   = cfg.default_raw_scale;
         j["thermal"]["default_refl_offset"] = cfg.default_refl_offset;
         j["thermal"]["default_temp_offset"] = cfg.default_temp_offset;
+        j["thermal"]["default_distance"]    = cfg.default_distance;
+        j["thermal"]["atmospheric_compensation"] = cfg.atmospheric_compensation;
+        j["thermal"]["ema_alpha"]           = cfg.ema_alpha;
+        j["thermal"]["warmup_minutes"]      = cfg.warmup_minutes;
 
         j["palette_path"]    = cfg.palette_path;
         j["screenshots_dir"] = cfg.screenshots_dir;

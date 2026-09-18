@@ -17,6 +17,42 @@ static inline int clampi(int v, int lo, int hi) {
     return v;
 }
 
+static inline double clampd(double v, double lo, double hi) {
+    if (v < lo) return lo;
+    if (v > hi) return hi;
+    return v;
+}
+
+// ============================================================
+// Atmospheric transmittance computation
+// FLIR-style model for LWIR 8-14μm band
+// Accounts for water vapor absorption (Beer-Lambert)
+// ============================================================
+double compute_tau(double distance_m, double humidity_pct, double T_atm_c) {
+    if (distance_m <= 0.0) return 1.0;
+    if (humidity_pct <= 0.0) return 1.0;
+
+    // Water vapor content estimate (g/m³) from relative humidity and temperature
+    // Uses Magnus-Tetens approximation for saturation vapor pressure
+    double h2o = (humidity_pct / 100.0) * exp(1.5587
+                  + 0.06939 * T_atm_c
+                  - 0.00027816 * T_atm_c * T_atm_c
+                  + 0.00000068455 * T_atm_c * T_atm_c * T_atm_c);
+
+    // FLIR-documented coefficients for LWIR 8-14μm atmospheric window
+    // Two-term exponential model for water vapor absorption
+    const double alpha1 = 0.006569;
+    const double alpha2 = 0.012620;
+    const double beta1  = -0.002276;
+    const double beta2  = -0.006670;
+
+    double sqrt_dh = sqrt(distance_m * h2o);
+    double tau = alpha1 * exp(beta1 * sqrt_dh)
+               + alpha2 * exp(beta2 * sqrt_dh);
+
+    return clampd(tau, 0.01, 1.0);
+}
+
 void Tunables::clamp() {
     if (emissivity < EMISS_MIN) emissivity = EMISS_MIN;
     if (emissivity > EMISS_MAX) emissivity = EMISS_MAX;
@@ -49,24 +85,53 @@ bool load_palette(const std::string& path, uint8_t colormap[768]) {
     return success;
 }
 
-static inline double raw2temperature_core(unsigned short RAW, double T_refl_c, double emissivity, double raw_scale) {
+// ============================================================
+// Full radiometric temperature conversion
+// Implements: U_total = tau*eps*U_obj + tau*(1-eps)*U_refl + (1-tau)*U_atm
+// Solving for U_obj, then converting to temperature via Planck inverse
+// ============================================================
+static inline double raw2temperature_full(unsigned short RAW, double T_refl_c,
+                                          double emissivity, double raw_scale,
+                                          double tau, double T_atm_c) {
     double raw = (double)RAW * raw_scale;
+
+    // Signal from reflected temperature
     const double RAWrefl = PLANCK_R1 / (PLANCK_R2 * (exp(PLANCK_B / (T_refl_c + 273.15)) - PLANCK_F)) - PLANCK_O;
+
+    // Signal from atmospheric temperature
+    const double RAWatm  = PLANCK_R1 / (PLANCK_R2 * (exp(PLANCK_B / (T_atm_c + 273.15)) - PLANCK_F)) - PLANCK_O;
+
     if (emissivity < 1e-6) emissivity = 1e-6;
-    const double RAWobj = (raw - (1.0 - emissivity) * RAWrefl) / emissivity;
+    if (tau < 1e-6) tau = 1e-6;
+
+    // Full radiometric compensation: solve for RAWobj
+    // U_total = tau*eps*U_obj + tau*(1-eps)*U_refl + (1-tau)*U_atm
+    const double RAWobj = (raw
+                           - (1.0 - tau) * RAWatm                  // subtract atmospheric emission
+                           - tau * (1.0 - emissivity) * RAWrefl    // subtract reflected radiation
+                          ) / (tau * emissivity);                   // divide by tau*epsilon
+
     return PLANCK_B / log(PLANCK_R1 / (PLANCK_R2 * (RAWobj + PLANCK_O)) + PLANCK_F) - 273.15;
 }
 
 ProcessedFrame process_frame(const ThermalFrame& frame,
                              const Tunables& tune,
                              double ambient_temp,
-                             const uint8_t colormap[768]) 
+                             const uint8_t colormap[768],
+                             const AtmosphericParams& atm)
 {
     ProcessedFrame pf;
     if (!frame.valid) return pf;
 
     double T_refl = ambient_temp + tune.refl_offset;
 
+    // Atmospheric transmittance — use precomputed or compute now
+    double tau = 1.0;
+    double T_atm = ambient_temp;
+    if (atm.enable_compensation) {
+        tau = atm.tau;  // Already computed by caller via compute_tau()
+        T_atm = atm.atm_temp;
+    }
     // 1) Find min/max RAW values
     int minv = 65535, maxv = 0;
     int maxx = 0, maxy = 0;
@@ -84,10 +149,11 @@ ProcessedFrame process_frame(const ThermalFrame& frame,
     pf.max_x = maxx;
     pf.max_y = maxy;
 
-    // 2) Temperature LUT
+    // 2) Temperature LUT — invalidate when any parameter changes
     static std::vector<float> tempLUT(65536);
     static bool lut_init = false;
     static double lut_Trefl = 1e9, lut_eps = 0.98, lut_scale = 4.0, lut_to = 0.0;
+    static double lut_tau = 1.0, lut_Tatm = 25.0;
     static int lut_lo = 65535, lut_hi = 0;
 
     int want_lo = std::max(0, minv - 512);
@@ -96,23 +162,27 @@ ProcessedFrame process_frame(const ThermalFrame& frame,
     if (!lut_init ||
         std::fabs(lut_Trefl - T_refl) > 0.05 ||
         std::fabs(lut_eps   - tune.emissivity) > 1e-9 ||
-        std::fabs(lut_scale - tune.raw_scale)   > 1e-9 ||
-        std::fabs(lut_to    - tune.temp_offset)    > 1e-9)
+        std::fabs(lut_scale - tune.raw_scale)  > 1e-9 ||
+        std::fabs(lut_to    - tune.temp_offset)   > 1e-9 ||
+        std::fabs(lut_tau   - tau)             > 1e-4 ||
+        std::fabs(lut_Tatm  - T_atm)          > 0.1)
     {
         lut_init = true;
-        lut_Trefl = T_refl; lut_eps = tune.emissivity; lut_scale = tune.raw_scale; lut_to = tune.temp_offset;
+        lut_Trefl = T_refl; lut_eps = tune.emissivity;
+        lut_scale = tune.raw_scale; lut_to = tune.temp_offset;
+        lut_tau = tau; lut_Tatm = T_atm;
         lut_lo = 65535; lut_hi = 0;
     }
 
     if (want_lo < lut_lo) {
         for (int raw = want_lo; raw < lut_lo; ++raw) {
-            tempLUT[raw] = (float)(raw2temperature_core((unsigned short)raw, T_refl, tune.emissivity, tune.raw_scale) + tune.temp_offset);
+            tempLUT[raw] = (float)(raw2temperature_full((unsigned short)raw, T_refl, tune.emissivity, tune.raw_scale, tau, T_atm) + tune.temp_offset);
         }
         lut_lo = want_lo;
     }
     if (want_hi > lut_hi) {
         for (int raw = lut_hi + 1; raw <= want_hi; ++raw) {
-            tempLUT[raw] = (float)(raw2temperature_core((unsigned short)raw, T_refl, tune.emissivity, tune.raw_scale) + tune.temp_offset);
+            tempLUT[raw] = (float)(raw2temperature_full((unsigned short)raw, T_refl, tune.emissivity, tune.raw_scale, tau, T_atm) + tune.temp_offset);
         }
         lut_hi = want_hi;
     }
@@ -153,6 +223,39 @@ ProcessedFrame process_frame(const ThermalFrame& frame,
     pf.center_temp = pf.temps[(THERMAL_HEIGHT/2) * THERMAL_WIDTH + (THERMAL_WIDTH/2)];
 
     return pf;
+}
+
+// ============================================================
+// EMA filter — smooths temperature readings across frames
+// ============================================================
+void apply_ema_filter(ProcessedFrame& pf, float alpha) {
+    static float ema_temps[THERMAL_WIDTH * THERMAL_HEIGHT];
+    static bool ema_initialized = false;
+
+    if (alpha <= 0.0f) alpha = 0.1f;
+    if (alpha > 1.0f) alpha = 1.0f;
+
+    const int N = THERMAL_WIDTH * THERMAL_HEIGHT;
+
+    if (!ema_initialized) {
+        std::memcpy(ema_temps, pf.temps, sizeof(float) * N);
+        ema_initialized = true;
+    } else {
+        for (int i = 0; i < N; ++i) {
+            ema_temps[i] = alpha * pf.temps[i] + (1.0f - alpha) * ema_temps[i];
+        }
+    }
+
+    // Write filtered values back + recalculate min/max/center
+    float min_t = 1e9f, max_t = -1e9f;
+    for (int i = 0; i < N; ++i) {
+        pf.temps[i] = ema_temps[i];
+        if (ema_temps[i] < min_t) min_t = ema_temps[i];
+        if (ema_temps[i] > max_t) max_t = ema_temps[i];
+    }
+    pf.min_temp = min_t;
+    pf.max_temp = max_t;
+    pf.center_temp = pf.temps[(THERMAL_HEIGHT/2) * THERMAL_WIDTH + (THERMAL_WIDTH/2)];
 }
 
 double get_spot_temp(const ProcessedFrame& pf, int x, int y) {

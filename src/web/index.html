@@ -46,6 +46,26 @@
                     </div>
                 </div>
 
+                <div id="warmup-card" class="card warmup-card">
+                    <h3>⏱ Warm-up</h3>
+                    <div class="card-content">
+                        <div id="warmup-text" class="warmup-warning">Camera đang khởi động...</div>
+                        <div class="progress-bar-container">
+                            <div id="warmup-progress" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <div id="warmup-time" style="font-size: 0.85em; color: #aaa;">0:00 / 15:00</div>
+                    </div>
+                </div>
+
+                <div class="card atm-card">
+                    <h3>Atmospheric</h3>
+                    <div class="card-content row-items">
+                        <div><span class="label">τ:</span> <span id="atm-tau">--.--</span></div>
+                        <div><span class="label">Dist:</span> <span id="atm-distance">--</span>m</div>
+                        <div id="atm-status" class="badge success">ON</div>
+                    </div>
+                </div>
+
                 <div class="card tuning-card">
                     <h3>Tuning <button id="btn-reset-tune" class="btn-small">Reset</button></h3>
                     <div class="card-content">

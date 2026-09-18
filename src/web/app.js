@@ -147,6 +147,51 @@ function handleFrame(msg) {
         updateTuningUI(msg.tunables);
     }
 
+    // Phase 1: Update atmospheric compensation display
+    if (msg.tau !== undefined) {
+        document.getElementById('atm-tau').textContent = msg.tau.toFixed(4);
+    }
+    if (msg.distance !== undefined) {
+        document.getElementById('atm-distance').textContent = msg.distance.toFixed(2);
+    }
+    if (msg.atm_compensation !== undefined) {
+        const atmBadge = document.getElementById('atm-status');
+        atmBadge.textContent = msg.atm_compensation ? 'ON' : 'OFF';
+        atmBadge.className = 'badge ' + (msg.atm_compensation ? 'success' : 'warning');
+    }
+
+    // Phase 2: Update warm-up status
+    if (msg.warmup_complete !== undefined) {
+        const warmupCard = document.getElementById('warmup-card');
+        const warmupText = document.getElementById('warmup-text');
+        const warmupProgress = document.getElementById('warmup-progress');
+        const warmupTime = document.getElementById('warmup-time');
+
+        if (msg.warmup_complete) {
+            warmupText.textContent = '✓ Camera ổn định';
+            warmupText.className = 'warmup-ok';
+            warmupProgress.style.width = '100%';
+            warmupProgress.style.background = '#2ea043';
+            warmupCard.style.borderColor = '#2ea043';
+            const totalMin = msg.warmup_required_min || 15;
+            warmupTime.textContent = totalMin + ':00 / ' + totalMin + ':00';
+        } else {
+            const elapsedSec = msg.warmup_elapsed_sec || 0;
+            const requiredMin = msg.warmup_required_min || 15;
+            const requiredSec = requiredMin * 60;
+            const pct = Math.min(100, (elapsedSec / requiredSec) * 100);
+            const elapsedMin = Math.floor(elapsedSec / 60);
+            const elapsedRemSec = elapsedSec % 60;
+            warmupText.textContent = '⚠ Camera đang ổn định...';
+            warmupText.className = 'warmup-warning';
+            warmupProgress.style.width = pct.toFixed(1) + '%';
+            warmupProgress.style.background = pct < 50 ? '#e3b341' : '#d29922';
+            warmupCard.style.borderColor = '#e3b341';
+            warmupTime.textContent = elapsedMin + ':' + String(elapsedRemSec).padStart(2,'0')
+                                   + ' / ' + requiredMin + ':00';
+        }
+    }
+
     // Update color bar
     if (msg.min_temp !== undefined && msg.max_temp !== undefined) {
         drawColorBar(msg.min_temp, msg.max_temp);

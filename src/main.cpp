@@ -280,6 +280,10 @@ int main(int argc, char** argv) {
     }
 
     FlirOneReader reader(cfg.usb_vendor_id, cfg.usb_product_id);
+
+    // Phase 2: Warm-up tracking
+    auto startup_time = std::chrono::steady_clock::now();
+    bool warmup_complete = false;
     
     while (g_running) {
         if (!reader.open_device()) {
@@ -297,10 +301,37 @@ int main(int argc, char** argv) {
             double Ta = g_Ta.load();
             double RH = g_RH.load();
             bool dht_ok = g_dht_ok.load();
-            
-            ProcessedFrame pf = process_frame(frame, tune, Ta, colormap);
+
+            // Phase 1: Build atmospheric compensation params from DHT12 + config
+            AtmosphericParams atm;
+            atm.distance     = cfg.default_distance;
+            atm.humidity     = RH;       // NOW USED in calculation!
+            atm.atm_temp     = Ta;
+            atm.enable_compensation = cfg.atmospheric_compensation;
+            atm.ema_alpha    = cfg.ema_alpha;
+            // Pre-compute atmospheric transmittance
+            if (atm.enable_compensation) {
+                atm.tau = compute_tau(atm.distance, atm.humidity, atm.atm_temp);
+            }
+
+            // Process frame with full radiometric compensation
+            ProcessedFrame pf = process_frame(frame, tune, Ta, colormap, atm);
+
+            // Phase 1: Apply EMA smoothing filter
+            if (atm.ema_alpha < 1.0) {
+                apply_ema_filter(pf, (float)atm.ema_alpha);
+            }
             
             { std::lock_guard<std::mutex> lk(g_frame_mutex); g_latest_frame = pf; }
+
+            // Phase 2: Check warm-up status
+            auto elapsed = std::chrono::steady_clock::now() - startup_time;
+            int warmup_elapsed_min = (int)std::chrono::duration_cast<std::chrono::minutes>(elapsed).count();
+            int warmup_elapsed_sec = (int)std::chrono::duration_cast<std::chrono::seconds>(elapsed).count();
+            if (!warmup_complete && warmup_elapsed_min >= cfg.warmup_minutes) {
+                warmup_complete = true;
+                fprintf(stderr, "✓ Camera warm-up complete (%d minutes)\n", cfg.warmup_minutes);
+            }
             
             nlohmann::json msg;
             msg["type"] = "frame";
@@ -314,6 +345,18 @@ int main(int argc, char** argv) {
             msg["dht_ok"] = dht_ok;
             msg["servo_angle"] = g_servo_angle.load();
             msg["servo_enabled"] = g_servo_enabled.load();
+
+            // Phase 1: Atmospheric compensation info
+            msg["tau"] = atm.tau;
+            msg["distance"] = atm.distance;
+            msg["atm_compensation"] = atm.enable_compensation;
+            msg["ema_alpha"] = atm.ema_alpha;
+
+            // Phase 2: Warm-up status
+            msg["warmup_complete"] = warmup_complete;
+            msg["warmup_elapsed_sec"] = warmup_elapsed_sec;
+            msg["warmup_required_min"] = cfg.warmup_minutes;
+
             msg["tunables"] = {
                 {"emissivity", tune.emissivity},
                 {"refl_offset", tune.refl_offset},

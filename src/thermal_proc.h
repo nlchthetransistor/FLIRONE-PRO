@@ -43,6 +43,24 @@ struct Tunables {
 };
 
 // ============================================================
+// AtmosphericParams — environmental compensation parameters
+// ============================================================
+struct AtmosphericParams {
+    double distance       = 0.5;    // Distance to object [m]
+    double humidity        = 50.0;   // Relative humidity [%]
+    double atm_temp        = 25.0;   // Atmospheric temperature [°C]
+    bool   enable_compensation = true;
+    double ema_alpha       = 0.3;    // EMA smoothing factor (0.1=smooth, 1.0=no filter)
+
+    // Computed value (set by compute_tau)
+    double tau             = 1.0;    // Atmospheric transmittance [0..1]
+};
+
+// Compute atmospheric transmittance based on distance, humidity, and temperature
+// Uses FLIR-style LWIR 8-14μm water vapor absorption model
+double compute_tau(double distance_m, double humidity_pct, double T_atm_c);
+
+// ============================================================
 // ThermalFrame — raw 16-bit data from FLIR One
 // ============================================================
 struct ThermalFrame {
@@ -69,10 +87,16 @@ struct ProcessedFrame {
 bool load_palette(const std::string& path, uint8_t colormap[768]);
 
 // Process a raw thermal frame into colorized RGB + temperatures
+// (atmospheric compensation version — uses humidity, distance, atm_temp)
 ProcessedFrame process_frame(const ThermalFrame& frame,
                              const Tunables& tune,
                              double ambient_temp,
-                             const uint8_t colormap[768]);
+                             const uint8_t colormap[768],
+                             const AtmosphericParams& atm = AtmosphericParams());
+
+// Apply Exponential Moving Average filter to smooth temperature readings
+// Call once per frame. First call initializes the filter state.
+void apply_ema_filter(ProcessedFrame& pf, float alpha);
 
 // Get spot temperature at (x, y)
 double get_spot_temp(const ProcessedFrame& pf, int x, int y);

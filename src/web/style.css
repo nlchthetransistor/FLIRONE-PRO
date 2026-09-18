@@ -362,3 +362,49 @@ input[type="range"]::-webkit-slider-runnable-track {
         grid-column: 1 / -1;
     }
 }
+
+/* Phase 2: Warm-up card */
+.warmup-card {
+    border: 1px solid #e3b341;
+    transition: border-color 0.5s ease;
+}
+
+.warmup-warning {
+    color: #e3b341;
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-bottom: 6px;
+}
+
+.warmup-ok {
+    color: #2ea043;
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-bottom: 6px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: #e3b341;
+    border-radius: 4px;
+    transition: width 1s linear, background 0.5s ease;
+}
+
+/* Phase 1: Atmospheric card */
+.atm-card {
+    border: 1px solid var(--accent2);
+}
+
+.badge.warning {
+    background: #e3b341;
+    color: #000;
+}
