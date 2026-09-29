@@ -29,7 +29,7 @@
         "default_emissivity": 0.98,
         "default_raw_scale": 4.0,
         "default_refl_offset": 0.0,
-        "default_temp_offset": 0.0,
+        "default_temp_offset": -2.0,
         "default_distance": 0.5,
         "atmospheric_compensation": true,
         "ema_alpha": 0.3,

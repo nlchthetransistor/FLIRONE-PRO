@@ -24,7 +24,7 @@ struct Tunables {
     double emissivity  = 0.98;
     double refl_offset = 0.0;
     double raw_scale   = 4.0;
-    double temp_offset = 0.0;
+    double temp_offset = -2.0;
 
     // Clamp limits
     static constexpr double EMISS_MIN = 0.70, EMISS_MAX = 1.00;

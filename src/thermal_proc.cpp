@@ -68,7 +68,7 @@ void Tunables::reset() {
     emissivity = 0.98;
     refl_offset = 0.0;
     raw_scale = 4.0;
-    temp_offset = 0.0;
+    temp_offset = -2.0;
 }
 
 bool load_palette(const std::string& path, uint8_t colormap[768]) {

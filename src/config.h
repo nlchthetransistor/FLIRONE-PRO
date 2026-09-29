@@ -34,7 +34,7 @@ struct AppConfig {
     double default_emissivity = 0.98;
     double default_raw_scale = 4.0;
     double default_refl_offset = 0.0;
-    double default_temp_offset = 0.0;
+    double default_temp_offset = -2.0;
 
     // Atmospheric compensation
     double default_distance = 0.5;           // Distance to object [m]

@@ -233,6 +233,16 @@ int main(int argc, char** argv) {
     }
     
     AppConfig cfg = load_config(config_path);
+
+    // Initialize runtime tunables from config
+    {
+        std::lock_guard<std::mutex> lk(g_tune_mutex);
+        g_tune.emissivity  = cfg.default_emissivity;
+        g_tune.refl_offset = cfg.default_refl_offset;
+        g_tune.raw_scale   = cfg.default_raw_scale;
+        g_tune.temp_offset = cfg.default_temp_offset;
+        g_tune.clamp();
+    }
     
     uint8_t colormap[768];
     if (!load_palette(cfg.palette_path, colormap)) {
