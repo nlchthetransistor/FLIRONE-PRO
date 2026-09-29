@@ -25,32 +25,37 @@ static inline double clampd(double v, double lo, double hi) {
 
 // ============================================================
 // Atmospheric transmittance computation
-// FLIR-style model for LWIR 8-14μm band
-// Accounts for water vapor absorption (Beer-Lambert)
+// Official FLIR radiometric model for LWIR 8-14μm band
+// Accounts for water vapor absorption (Beer-Lambert law)
 // ============================================================
 double compute_tau(double distance_m, double humidity_pct, double T_atm_c) {
     if (distance_m <= 0.0) return 1.0;
     if (humidity_pct <= 0.0) return 1.0;
 
-    // Water vapor content estimate (g/m³) from relative humidity and temperature
-    // Uses Magnus-Tetens approximation for saturation vapor pressure
-    double h2o = (humidity_pct / 100.0) * exp(1.5587
-                  + 0.06939 * T_atm_c
-                  - 0.00027816 * T_atm_c * T_atm_c
-                  + 0.00000068455 * T_atm_c * T_atm_c * T_atm_c);
+    // Water vapor saturation pressure (hPa) and absolute humidity (g/m³)
+    // Magnus-Tetens approximation
+    double p_sat = 6.112 * exp((17.67 * T_atm_c) / (T_atm_c + 243.5));
+    double h2o = (humidity_pct / 100.0) * (216.7 * p_sat / (T_atm_c + 273.15));
 
-    // FLIR-documented coefficients for LWIR 8-14μm atmospheric window
-    // Two-term exponential model for water vapor absorption
-    const double alpha1 = 0.006569;
-    const double alpha2 = 0.012620;
-    const double beta1  = -0.002276;
-    const double beta2  = -0.006670;
+    // FLIR official radiometric atmospheric transmission model constants:
+    // tau = ATX * exp(-sqrt(d/2) * (ATA1 + ATB1 * sqrt(h2o)))
+    //     + (1 - ATX) * exp(-sqrt(d/2) * (ATA2 + ATB2 * sqrt(h2o)))
+    const double ATX  = 1.9;
+    const double ATA1 = 0.006569;
+    const double ATA2 = 0.012620;
+    const double ATB1 = -0.002276;
+    const double ATB2 = -0.006670;
 
-    double sqrt_dh = sqrt(distance_m * h2o);
-    double tau = alpha1 * exp(beta1 * sqrt_dh)
-               + alpha2 * exp(beta2 * sqrt_dh);
+    double sqrt_d = sqrt(distance_m / 2.0);
+    double sqrt_h = sqrt(std::max(0.0, h2o));
 
-    return clampd(tau, 0.01, 1.0);
+    double term1 = ATA1 + ATB1 * sqrt_h;
+    double term2 = ATA2 + ATB2 * sqrt_h;
+
+    double tau = ATX * exp(-sqrt_d * term1) + (1.0 - ATX) * exp(-sqrt_d * term2);
+
+    // At medical screening distances (<2m), atmospheric transmittance is ~0.95 - 0.999
+    return clampd(tau, 0.70, 1.0);
 }
 
 void Tunables::clamp() {
